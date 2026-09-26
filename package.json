@@ -1,6 +1,7 @@
 {
   "name": "artinus-fe-test",
   "version": "1.0.0",
+  "packageManager": "pnpm@12.4.2",
   "main": "index.ts",
   "dependencies": {
     "expo": "~57.0.24",
@@ -12,6 +13,8 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "~57.0.2",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -19,7 +22,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios --device",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings=0"
   },
   "private": true
 }
