@@ -11,13 +11,13 @@
 - 검증 기기: iPhone 16 Pro Max, 9/28부터 사용 가능한 Android 실기기
 - UI: 평가자가 정상 동작과 오류 복구를 쉽게 확인하는 수준. 기능 완성도를 우선한다.
 - 작업 단위: 하나의 PR은 하나의 완료 조건을 가진 작업으로 구성한다.
-- 상태: 계획 확정. Expo 기본 프로젝트는 구성됐으며 아래 PR은 아직 시작하지 않았다. 실제 구현과 제출은 별도 요청에 따른다.
+- 상태: 계획 확정. PR 01 개발 빌드 환경과 양 플랫폼 기본 앱 실행 조건을 확인했다. 환경·명령·검증 범위는 [PR 01 기록](pr-01-development-build.md)에 있다.
 
 ## 목표와 현재 상태
 
 iOS와 Android에서 카메라 프리뷰 → 정지 이미지 촬영 → OCR → 결과 확인 → 재촬영 흐름을 제공한다. 양 플랫폼 기능 패리티, 실기기에서 원활한 프리뷰, OCR 중 UI 응답, 권한 거부·인식 실패·나쁜 입력에서의 복구를 검증한다.
 
-현재 저장소에는 Expo SDK 57, React Native, TypeScript 기본 프로젝트와 pnpm 잠금 파일이 있다. 의존성 설치, TypeScript 검사, Metro 기동은 확인했다. 카메라·OCR 기능, 네이티브 빌드, 기기 실행은 아직 검증하지 않았다.
+현재 저장소에는 Expo SDK 57, React Native, TypeScript 기본 프로젝트와 pnpm 잠금 파일이 있다. 의존성 설치, TypeScript 검사, Metro 기동을 확인했다. PR 01에서 development client 설정과 양 플랫폼 JavaScript 번들·네이티브 프로젝트 생성을 확인했다. iPhone 16 Pro Max / iPhone OS 27.0에서 기본 앱 빌드·실행을 사용자 확인으로 기록했고, Pixel 9 에뮬레이터 / Android 16(API 36)에서 기본 앱 빌드·설치·화면 실행을 직접 확인했다. 카메라·OCR 기능과 Android 실기기는 아직 검증하지 않았다.
 
 계획 수립 시 Xcode 앱은 설치되어 있었지만 활성 개발 도구 경로는 Command Line Tools였다. Android Studio, 기본 경로의 Android SDK, PATH의 adb, Java 런타임은 확인되지 않았다. PR 01에서 실제 설치·선택·서명 상태를 다시 확인한다.
 
@@ -68,11 +68,11 @@ iOS와 Android에서 카메라 프리뷰 → 정지 이미지 촬영 → OCR →
 
 ### PR 01 — 양 플랫폼 개발 빌드 환경 구성
 
-- [ ] Xcode 개발 도구 경로, 필수 컴포넌트, iPhone 서명·연결 상태를 확인하고 설정한다.
-- [ ] Android Studio·SDK·JDK·에뮬레이터를 구성한다.
-- [ ] Expo development build 설정과 로컬 빌드·실행 명령을 구성한다.
-- [ ] iPhone 실기기와 Android 에뮬레이터에서 기본 앱을 실행한다.
-- [ ] 도구·OS 버전, 설치·실행 절차, 서명 등 사용자 환경별 전제조건을 기록한다.
+- [x] Xcode 개발 도구 경로, 필수 컴포넌트, iPhone 서명·연결 상태를 확인하고 설정한다.
+- [x] Android Studio·SDK·JDK·에뮬레이터를 구성한다.
+- [x] Expo development build 설정과 로컬 빌드·실행 명령을 구성한다.
+- [x] iPhone 실기기와 Android 에뮬레이터에서 기본 앱을 실행한다.
+- [x] 도구·OS 버전, 설치·실행 절차, 서명 등 사용자 환경별 전제조건을 기록한다. 미완료·미확인 항목은 [PR 01 기록](pr-01-development-build.md)에 명시한다.
 
 로컬 도구 설치 자체는 PR에 담을 수 없으므로 재현 가능한 프로젝트 설정·실행 절차·검증 기록을 산출물로 남긴다.
 
