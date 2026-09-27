@@ -22,4 +22,6 @@ pnpm ios
 
 최초 설치 후 TypeScript/JavaScript만 수정했다면 `pnpm start`로 Metro를 켜고 설치된 개발 빌드에서 프로젝트를 엽니다. 카메라 패키지와 `app.json` 플러그인을 반영하려면 `pnpm expo prebuild --clean` 후 해당 플랫폼을 다시 빌드합니다. 촬영 기능은 카메라가 있는 기기에서 확인해야 합니다. `pnpm typecheck`와 `pnpm lint`로 정적 검사를 실행합니다.
 
-기본 앱의 iPhone 실기기·Android 에뮬레이터 실행 결과는 [PR 01 개발 빌드 기록](docs/pr-01-development-build.md)에 있습니다. 카메라 권한·프리뷰·촬영·이미지 방향은 아직 기기에서 검증하지 않았으며, 절차는 [PR 03 카메라 촬영 기록](docs/pr03-camera-capture.md)에 있습니다. 자동 검사 결과는 [PR 02 검사 기록](docs/quality-gates.md), 과제 목표는 [과제 계획](docs/assignment-plan.md)을 참고하세요.
+Mac이 iPhone 핫스팟을 사용하는 등 기기에서 Metro의 LAN 주소에 접속할 수 없다면 `pnpm start:tunnel`로 HTTPS 터널을 시작하고 터미널의 새 QR 코드를 iPhone 카메라로 스캔합니다. 처음 실행할 때 Expo가 요구하는 `@expo/ngrok` 전역 설치가 필요합니다. 기존 LAN 주소를 가리키는 앱 화면의 `Reload`는 사용하지 않습니다.
+
+기본 앱의 iPhone 실기기·Android 에뮬레이터 실행 결과는 [PR 01 개발 빌드 기록](docs/pr-01-development-build.md)에 있습니다. PR 03 개발 빌드의 iPhone 카메라 권한·촬영 확인 후 사용자가 iPhone 테스트를 모두 완료했다고 보고했습니다. Android 카메라 검증은 사용자 결정에 따라 실기기 확보 후 진행합니다. 자세한 범위는 [PR 03 카메라 촬영 기록](docs/pr03-camera-capture.md), 자동 검사 결과는 [PR 02 검사 기록](docs/quality-gates.md), 과제 목표는 [과제 계획](docs/assignment-plan.md)을 참고하세요.

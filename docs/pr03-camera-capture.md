@@ -38,10 +38,24 @@ PR 04는 이 화면의 `photo.uri`를 OCR 입력으로 연결해야 한다. PR 0
 
 PR 01·02가 반영된 `main`을 이 브랜치에 병합했다. 개발 빌드의 `expo-dev-client`·`expo-build-properties`, PR 03의 `expo-camera`, PR 02의 ESLint 설정을 모두 유지했다. `app.json`의 두 플러그인 배열을 하나로 합쳤고, 전체 의존성에 맞춰 잠금 파일을 재생성했다. `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint`, `pnpm expo config --type public`, `git diff --check`가 통과했다. Expo 설정 출력에서 iOS Scene 지원과 카메라 설정, Android CAMERA 권한을 확인했다. 카메라 기능의 기기 동작은 여전히 미검증이다.
 
+## 2026-09-27 iPhone 핫스팟 로딩 문제
+
+사용자가 iPhone 16 Pro Max에서 개발 빌드를 열었을 때 `http://192.0.0.2:8081`에 대한 iOS App Transport Security 오류를 보고했다. Mac은 iPhone 핫스팟을 사용 중이었다. Mac의 Metro 상태·iOS 번들은 HTTP 200이었지만 iPhone Safari에서는 같은 주소에 연결하지 못했다. 따라서 카메라 코드 동작을 확인하기 전 개발 서버 연결 단계에서 막힌 상태로 기록한다.
+
+Expo 공식 안내의 [터널 연결](https://docs.expo.dev/develop/development-builds/development-workflows/)을 사용해 HTTPS 터널이 준비되고 상태 URL이 HTTP 200을 반환하는 것을 확인했다. 사용자 요청에 따라 두 개발 서버를 종료하고 `pnpm start:tunnel` 스크립트를 추가했다. 이 Mac에는 필요한 `@expo/ngrok` 도구를 전역 설치했다.
+
+## 2026-09-27 iPhone 사용자 수동 검증
+
+사용자가 `pnpm start:tunnel`로 개발 서버를 실행한 뒤 iPhone에서 카메라 권한 획득과 촬영 성공을 보고했다. 기기는 앞선 PR 01에서 확인한 iPhone 16 Pro Max이며, 당시 OS는 iPhone OS 27.0이었다. 이번 촬영 시점의 OS 버전은 재확인하지 않았다. 이는 **사용자 보고 결과**이며 에이전트가 촬영 화면이나 이미지를 직접 확인한 결과는 아니다.
+
+이후 사용자가 iPhone에서 요청한 테스트를 모두 완료했다고 추가 보고했다. 개별 항목의 결과와 실패 여부는 아직 별도로 받지 못해, 촬영 이미지 표시·방향, 다시 촬영, 권한 거부 안내, 오류 복구를 항목별 통과로 기록하지 않는다. 카메라 시작·촬영 실패를 강제로 재현했는지도 확인되지 않았다.
+
+Android는 사용자가 실기기 확보 후 검증하기로 결정해 이번 단계의 에뮬레이터 카메라 검증을 건너뛰었다. 이는 계획 문서의 PR 03 양 플랫폼 촬영·이미지 방향 확인 조건과 다르다. PR 01에서 확인한 Android 에뮬레이터의 기본 앱 실행은 카메라 검증 결과가 아니다. Android 실기기 권한·프리뷰·촬영·이미지 방향은 미검증으로 남긴다.
+
 ## AI 활용 기록
 
 - 문제: SDK 57에 맞는 카메라 API와 권한·촬영·오류 흐름이 필요했다.
 - 요청 내용: PR 03 범위에서 최초 권한 요청, 프리뷰, 정지 이미지 촬영·확인, 최소 오류 복구를 구현하도록 요청받았다.
 - 제안: Codex가 Expo 공식 문서를 확인하고 `expo-camera`, `CameraView`, `useCameraPermissions`, 카메라 준비 신호, 사진 확인 화면을 제안·작성했다.
 - 채택·수정·기각 판단: 공식 문서의 SDK 권장 버전을 채택했다. 첫 타입 검사에서 `StyleSheet.absoluteFillObject`가 없다는 오류를 확인하고 `StyleSheet.absoluteFill`로 직접 수정했다. 미검증 상태의 방향 정상 동작은 완료로 기록하지 않았다.
-- 검증 결과: 위 정적 검사와 양 플랫폼 JS 번들 생성까지 직접 확인했다. 네이티브 빌드와 기기 동작은 미검증이다.
+- 검증 결과: 초기 정적 검사와 양 플랫폼 JS 번들 생성은 에이전트가 직접 확인했다. 이후 사용자가 iPhone 권한 획득·촬영과 iPhone 테스트 완료를 보고했다. Android 카메라 동작은 미검증이다.
