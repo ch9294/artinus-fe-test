@@ -25,6 +25,14 @@
     },
     "plugins": [
       [
+        "expo-camera",
+        {
+          "cameraPermission": "글자를 촬영할 수 있도록 카메라 접근을 허용해 주세요.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "ios": {
