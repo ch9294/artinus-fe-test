@@ -17,7 +17,7 @@ Expo SDK 57의 flat ESLint 설정을 적용했다. `pnpm-workspace.yaml`은 ESLi
 - `pnpm typecheck`: 통과. 임시 파일의 `string` 변수에 숫자를 대입했을 때 TS2322와 종료 코드 2로 실패함을 확인했다.
 - `pnpm lint`: 통과. 임시 파일에 문법 오류를 넣었을 때 파싱 오류와 종료 코드 1로 실패함을 확인했다.
 - 두 임시 오류와 검증 파일은 제거했다.
-- GitHub Actions의 Ubuntu 러너와 원격 이벤트 실행은 아직 미검증이다. 로컬 재검증은 macOS에서 수행했으며, iOS/Android 빌드와 기기 동작은 이 PR의 검증 대상이 아니다.
+- PR #3의 GitHub Actions `quality` 작업이 `ubuntu-latest`에서 통과했다([실행 기록](https://github.com/ch9294/artinus-fe-test/actions/runs/36220770873/job/108345483184)). 워크플로는 Node.js 24에서 고정 설치, 타입 검사, 린트를 실행한다. 로컬 재검증은 macOS에서 수행했으며, iOS/Android 빌드와 기기 동작은 이 PR의 검증 대상이 아니다.
 
 ## PR 01 통합 결과
 
@@ -29,4 +29,4 @@ PR 01이 포함된 `main`의 `26a9b26` 위로 이 변경을 리베이스했다. 
 - 요청: pnpm 잠금 파일 설치, 타입 검사, 린트, GitHub Actions 구성과 로컬 검증.
 - 제안: Expo flat ESLint 설정과 고정 pnpm 버전을 사용해 PR 워크플로에서 같은 명령을 실행한다.
 - 채택·수정: Expo SDK 57 호환 `eslint-config-expo`를 채택하고, peer dependency 검사 결과에 따라 ESLint 10 대신 9를 선택했다. pnpm 12의 설치 스크립트 정책에 맞춰 `unrs-resolver`를 명시적으로 허용했다.
-- 직접 검증: 고정 설치와 두 검사 통과, 타입·린트 오류에 대한 실패 감지, peer dependency 문제 없음. GitHub Actions 실행은 미검증.
+- 직접 검증: 고정 설치와 두 검사 통과, 타입·린트 오류에 대한 실패 감지, peer dependency 문제 없음, PR #3의 GitHub Actions `quality` 작업 통과.
