@@ -6,20 +6,12 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "plugins": [
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "글자를 촬영할 수 있도록 카메라 접근을 허용해 주세요.",
-          "recordAudioAndroid": false,
-          "barcodeScannerEnabled": false
-        }
-      ]
-    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ch9294.artinusfetest"
     },
     "android": {
+      "package": "com.ch9294.artinusfetest",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -30,6 +22,24 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "글자를 촬영할 수 있도록 카메라 접근을 허용해 주세요.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
+      ]
+    ]
   }
 }

@@ -34,6 +34,10 @@
 
 PR 04는 이 화면의 `photo.uri`를 OCR 입력으로 연결해야 한다. PR 06은 설정에서 권한을 바꾼 뒤 앱 재시작 없이 복구하는 흐름을 추가해야 한다. PR 07은 처리 중 이탈, 늦은 결과, 임시 파일 정리를 다룬다. PR 02의 린트 명령과 CI가 통합되면 이 변경에 대해 실행해야 한다.
 
+## 2026-09-27 베이스 브랜치 통합
+
+PR 01·02가 반영된 `main`을 이 브랜치에 병합했다. 개발 빌드의 `expo-dev-client`·`expo-build-properties`, PR 03의 `expo-camera`, PR 02의 ESLint 설정을 모두 유지했다. `app.json`의 두 플러그인 배열을 하나로 합쳤고, 전체 의존성에 맞춰 잠금 파일을 재생성했다. `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint`, `pnpm expo config --type public`, `git diff --check`가 통과했다. Expo 설정 출력에서 iOS Scene 지원과 카메라 설정, Android CAMERA 권한을 확인했다. 카메라 기능의 기기 동작은 여전히 미검증이다.
+
 ## AI 활용 기록
 
 - 문제: SDK 57에 맞는 카메라 API와 권한·촬영·오류 흐름이 필요했다.
