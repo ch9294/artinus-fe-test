@@ -1,4 +1,5 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { File } from 'expo-file-system';
 import { StatusBar } from 'expo-status-bar';
 import { recognizeText } from 'rn-mlkit-ocr';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -17,13 +18,26 @@ import {
 import { captureFlowReducer, initialCaptureFlow } from './src/captureFlow';
 import { cameraPermissionState } from './src/cameraPermission';
 import { summarizeOcrResults } from './src/ocrResult';
+import { RequestGate } from './src/requestGate';
+import { TemporaryPhotos } from './src/temporaryPhotos';
 
 export default function App() {
   const [permission, requestPermission, getPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
-  const captureInProgress = useRef(false);
-  const ocrInProgress = useRef(false);
-  const ocrRequestId = useRef(0);
+  const [requests] = useState(() => new RequestGate());
+  const [photos] = useState(() => new TemporaryPhotos((uri) => {
+    try {
+      const file = new File(uri);
+      if (file.exists) file.delete();
+    } catch (error) {
+      console.warn('Temporary camera photo could not be removed', error);
+    }
+  }));
+  const currentPhoto = useRef<string | null>(null);
+  const cameraSession = useRef(0);
+  const [appActive, setAppActive] = useState(
+    AppState.currentState !== 'background' && AppState.currentState !== 'inactive'
+  );
   const [cameraKey, setCameraKey] = useState(0);
   const [cameraReady, setCameraReady] = useState(false);
   const [capturing, setCapturing] = useState(false);
@@ -32,26 +46,62 @@ export default function App() {
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [permissionRefreshing, setPermissionRefreshing] = useState(false);
   const [permissionCheckFailed, setPermissionCheckFailed] = useState(false);
+  const permissionRefreshPending = useRef(false);
+  const permissionRefreshId = useRef(0);
 
   const refreshPermission = useCallback(async () => {
+    const refreshId = ++permissionRefreshId.current;
+    permissionRefreshPending.current = true;
     setPermissionRefreshing(true);
     setPermissionCheckFailed(false);
     try {
       await getPermission();
-      setPermissionError(null);
+      if (permissionRefreshId.current === refreshId) setPermissionError(null);
     } catch {
-      setPermissionCheckFailed(true);
+      if (permissionRefreshId.current === refreshId) setPermissionCheckFailed(true);
     } finally {
-      setPermissionRefreshing(false);
+      if (permissionRefreshId.current === refreshId) {
+        permissionRefreshPending.current = false;
+        setPermissionRefreshing(false);
+      }
     }
   }, [getPermission]);
 
   useEffect(() => {
+    if (flow.screen === 'result' && currentPhoto.current) {
+      photos.discard(currentPhoto.current);
+      currentPhoto.current = null;
+    }
+  }, [flow.screen, photos]);
+
+  useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void refreshPermission();
+      const active = state === 'active';
+      requests.setActive(active);
+      setAppActive(active);
+      setCameraReady(false);
+      cameraSession.current += 1;
+      setCameraKey(cameraSession.current);
+      if (active) {
+        setCameraError(null);
+        void refreshPermission();
+      } else {
+        permissionRefreshId.current += 1;
+        permissionRefreshPending.current = false;
+        setPermissionRefreshing(false);
+        dispatch({ type: 'interrupted' });
+        setCapturing(false);
+      }
     });
     return () => subscription.remove();
-  }, [refreshPermission]);
+  }, [refreshPermission, requests]);
+
+  useEffect(() => {
+    return () => {
+      requests.setActive(false);
+      if (currentPhoto.current) photos.discard(currentPhoto.current);
+    };
+  }, [photos, requests]);
 
   async function askForPermission() {
     setPermissionError(null);
@@ -72,66 +122,84 @@ export default function App() {
   }
 
   async function takePhoto() {
-    if (flow.screen !== 'camera' || !cameraReady || !camera.current || captureInProgress.current) return;
+    if (flow.screen !== 'camera' || !cameraReady || !camera.current ||
+      !appActive || permissionRefreshPending.current || cameraPermissionState(permission) !== 'allowed') return;
 
-    captureInProgress.current = true;
+    const ticket = requests.begin('capture');
+    if (ticket === null) return;
+
     setCapturing(true);
     setCameraError(null);
     try {
       // Expo processes orientation before returning the temporary image URI.
       const result = await camera.current.takePictureAsync({ skipProcessing: false });
       if (!result?.uri) throw new Error('Camera returned no image');
-      dispatch({ type: 'captured', photo: { uri: result.uri, width: result.width, height: result.height } });
+      if (requests.isCurrent('capture', ticket)) {
+        currentPhoto.current = result.uri;
+        dispatch({ type: 'captured', photo: { uri: result.uri, width: result.width, height: result.height } });
+      } else {
+        photos.discard(result.uri);
+      }
     } catch {
-      setCameraError('촬영하지 못했습니다. 다시 시도해 주세요.');
+      if (requests.isCurrent('capture', ticket)) {
+        setCameraError('촬영하지 못했습니다. 다시 시도해 주세요.');
+      }
     } finally {
-      captureInProgress.current = false;
-      setCapturing(false);
+      if (requests.isCurrent('capture', ticket)) setCapturing(false);
+      requests.finish('capture', ticket);
     }
   }
 
   async function recognizePhoto() {
-    if (flow.screen !== 'photo' || flow.imageError || ocrInProgress.current) return;
+    if (flow.screen !== 'photo' || flow.imageError || !appActive ||
+      permissionRefreshPending.current) return;
 
-    const requestId = ++ocrRequestId.current;
-    ocrInProgress.current = true;
+    const ticket = requests.begin('ocr');
+    if (ticket === null) return;
+    const uri = flow.photo.uri;
+    photos.retain(uri);
     dispatch({ type: 'ocrStarted' });
 
     try {
       const results = await Promise.allSettled([
-        recognizeText(flow.photo.uri, 'korean'),
-        recognizeText(flow.photo.uri, 'latin'),
+        recognizeText(uri, 'korean'),
+        recognizeText(uri, 'latin'),
       ]);
-      if (ocrRequestId.current === requestId) {
-        dispatch({ type: 'ocrFinished', result: summarizeOcrResults(results) });
+      if (requests.isCurrent('ocr', ticket)) {
+        const result = summarizeOcrResults(results);
+        dispatch({ type: 'ocrFinished', result });
       }
     } catch {
-      if (ocrRequestId.current === requestId) dispatch({ type: 'ocrFinished', result: { status: 'error' } });
+      if (requests.isCurrent('ocr', ticket)) dispatch({ type: 'ocrFinished', result: { status: 'error' } });
     } finally {
-      if (ocrRequestId.current === requestId) ocrInProgress.current = false;
+      requests.finish('ocr', ticket);
+      photos.release(uri);
     }
   }
 
   function retakePhoto() {
-    ocrRequestId.current += 1;
-    ocrInProgress.current = false;
+    requests.invalidate();
+    if (currentPhoto.current) photos.discard(currentPhoto.current);
+    currentPhoto.current = null;
     dispatch({ type: 'retake' });
     setCameraError(null);
     setCameraReady(false);
-    setCameraKey((key) => key + 1);
+    cameraSession.current += 1;
+    setCameraKey(cameraSession.current);
   }
 
   function retryCamera() {
     setCameraError(null);
     setCameraReady(false);
-    setCameraKey((key) => key + 1);
+    cameraSession.current += 1;
+    setCameraKey(cameraSession.current);
   }
 
   let content;
 
   const permissionState = cameraPermissionState(permission);
 
-  if (permissionState === 'checking' || permissionRefreshing) {
+  if (!appActive || permissionState === 'checking' || permissionRefreshing) {
     content = (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#ffffff" accessibilityLabel="카메라 권한 확인 중" />
@@ -202,7 +270,7 @@ export default function App() {
         ) : (
           <Image
             accessibilityLabel="촬영한 이미지"
-            onError={() => dispatch({ type: 'imageFailed' })}
+            onError={() => dispatch({ type: 'imageFailed', uri: flow.photo.uri })}
             resizeMode="contain"
             source={{ uri: flow.photo.uri }}
             style={styles.photo}
@@ -250,10 +318,16 @@ export default function App() {
             autofocus="off"
             facing="back"
             mode="picture"
-            onCameraReady={() => setCameraReady(true)}
+            onCameraReady={() => {
+              if (cameraSession.current === cameraKey && appActive) {
+                setCameraReady(true);
+              }
+            }}
             onMountError={() => {
-              setCameraReady(false);
-              setCameraError('카메라를 시작하지 못했습니다. 다시 시도해 주세요.');
+              if (cameraSession.current === cameraKey && appActive) {
+                setCameraReady(false);
+                setCameraError('카메라를 시작하지 못했습니다. 다시 시도해 주세요.');
+              }
             }}
             style={styles.preview}
           />

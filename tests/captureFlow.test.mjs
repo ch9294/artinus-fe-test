@@ -40,7 +40,7 @@ test('shows the complete OCR result and clears it before a second capture', () =
 });
 
 test('retake clears image and OCR errors, and ignores a finished result after leaving the photo', () => {
-  const imageFailure = reduce([{ type: 'captured', photo: firstPhoto }, { type: 'imageFailed' }]);
+  const imageFailure = reduce([{ type: 'captured', photo: firstPhoto }, { type: 'imageFailed', uri: firstPhoto.uri }]);
   assert.equal(imageFailure.screen, 'photo');
   assert.equal(imageFailure.imageError, true);
   assert.deepEqual(captureFlowReducer(imageFailure, { type: 'retake' }), { screen: 'camera' });
@@ -58,4 +58,18 @@ test('retake clears image and OCR errors, and ignores a finished result after le
   assert.deepEqual(captureFlowReducer(leftPhoto, {
     type: 'ocrFinished', result: { status: 'success', text: '이전 사진', partialFailure: false },
   }), { screen: 'camera' });
+});
+
+test('rejects duplicate transitions and stale image errors, then resets interrupted OCR', () => {
+  const captured = reduce([{ type: 'captured', photo: firstPhoto }]);
+  assert.equal(captureFlowReducer(captured, { type: 'captured', photo: secondPhoto }), captured);
+  assert.equal(captureFlowReducer(captured, { type: 'imageFailed', uri: secondPhoto.uri }), captured);
+
+  const processing = captureFlowReducer(captured, { type: 'ocrStarted' });
+  assert.equal(captureFlowReducer(processing, { type: 'ocrStarted' }), processing);
+  const interrupted = captureFlowReducer(processing, { type: 'interrupted' });
+  assert.deepEqual(interrupted, { ...captured, ocr: { status: 'idle' } });
+  assert.equal(captureFlowReducer(interrupted, {
+    type: 'ocrFinished', result: { status: 'success', text: '늦은 결과', partialFailure: false },
+  }), interrupted);
 });
