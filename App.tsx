@@ -1,15 +1,18 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { StatusBar } from 'expo-status-bar';
+import { recognizeText } from 'rn-mlkit-ocr';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { OcrSummary, summarizeOcrResults } from './src/ocrResult';
 
 type CapturedPhoto = {
   uri: string;
@@ -17,10 +20,14 @@ type CapturedPhoto = {
   height: number;
 };
 
+type OcrState = OcrSummary | { status: 'idle' | 'processing' };
+
 export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
   const captureInProgress = useRef(false);
+  const ocrInProgress = useRef(false);
+  const ocrRequestId = useRef(0);
   const [cameraKey, setCameraKey] = useState(0);
   const [cameraReady, setCameraReady] = useState(false);
   const [capturing, setCapturing] = useState(false);
@@ -28,6 +35,7 @@ export default function App() {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
   const [permissionError, setPermissionError] = useState(false);
+  const [ocrState, setOcrState] = useState<OcrState>({ status: 'idle' });
 
   async function askForPermission() {
     setPermissionError(false);
@@ -49,6 +57,7 @@ export default function App() {
       const result = await camera.current.takePictureAsync({ skipProcessing: false });
       if (!result?.uri) throw new Error('Camera returned no image');
       setImageError(false);
+      setOcrState({ status: 'idle' });
       setPhoto({ uri: result.uri, width: result.width, height: result.height });
     } catch {
       setCameraError('촬영하지 못했습니다. 다시 시도해 주세요.');
@@ -58,7 +67,32 @@ export default function App() {
     }
   }
 
+  async function recognizePhoto() {
+    if (!photo || imageError || ocrInProgress.current) return;
+
+    const requestId = ++ocrRequestId.current;
+    ocrInProgress.current = true;
+    setOcrState({ status: 'processing' });
+
+    try {
+      const results = await Promise.allSettled([
+        recognizeText(photo.uri, 'korean'),
+        recognizeText(photo.uri, 'latin'),
+      ]);
+      if (ocrRequestId.current === requestId) {
+        setOcrState(summarizeOcrResults(results));
+      }
+    } catch {
+      if (ocrRequestId.current === requestId) setOcrState({ status: 'error' });
+    } finally {
+      if (ocrRequestId.current === requestId) ocrInProgress.current = false;
+    }
+  }
+
   function retakePhoto() {
+    ocrRequestId.current += 1;
+    ocrInProgress.current = false;
+    setOcrState({ status: 'idle' });
     setPhoto(null);
     setImageError(false);
     setCameraError(null);
@@ -111,6 +145,42 @@ export default function App() {
             source={{ uri: photo.uri }}
             style={styles.photo}
           />
+        )}
+        {ocrState.status === 'processing' && (
+          <View style={styles.ocrProgress}>
+            <ActivityIndicator color="#ffffff" accessibilityLabel="텍스트 인식 중" />
+            <Text style={styles.description}>텍스트 인식 중…</Text>
+          </View>
+        )}
+        {ocrState.status === 'success' && (
+          <View style={styles.resultContainer}>
+            <Text style={styles.resultTitle}>인식 결과</Text>
+            {ocrState.partialFailure && (
+              <Text style={styles.error}>한 언어의 인식에 실패해 일부 결과만 표시했습니다.</Text>
+            )}
+            <ScrollView nestedScrollEnabled>
+              <Text selectable style={styles.resultText}>{ocrState.text}</Text>
+            </ScrollView>
+          </View>
+        )}
+        {ocrState.status === 'empty' && (
+          <Text style={styles.description}>글자를 찾지 못했습니다. 다시 촬영하거나 인식을 재시도해 주세요.</Text>
+        )}
+        {ocrState.status === 'error' && (
+          <Text style={styles.error}>텍스트를 인식하지 못했습니다. 다시 시도해 주세요.</Text>
+        )}
+        {!imageError && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: ocrState.status === 'processing' }}
+            disabled={ocrState.status === 'processing'}
+            onPress={recognizePhoto}
+            style={[styles.primaryButton, ocrState.status === 'processing' && styles.disabledButton]}
+          >
+            <Text style={styles.primaryButtonText}>
+              {ocrState.status === 'idle' ? '텍스트 인식' : '다시 인식'}
+            </Text>
+          </Pressable>
         )}
         <Pressable accessibilityRole="button" onPress={retakePhoto} style={styles.primaryButton}>
           <Text style={styles.primaryButtonText}>다시 촬영</Text>
@@ -180,6 +250,10 @@ const styles = StyleSheet.create({
   previewOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   photo: { flex: 1, width: '100%', backgroundColor: '#25313b' },
   imageFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  ocrProgress: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
+  resultContainer: { maxHeight: 180, gap: 8, borderRadius: 12, padding: 12, backgroundColor: '#25313b' },
+  resultTitle: { color: '#ffffff', fontSize: 17, fontWeight: '700' },
+  resultText: { color: '#ffffff', fontSize: 16, lineHeight: 24 },
   error: { color: '#ffb4a9', fontSize: 15, textAlign: 'center' },
   primaryButton: {
     minHeight: 52,

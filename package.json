@@ -10,7 +10,8 @@
     "expo-dev-client": "~57.0.19",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
-    "react-native": "0.86.3"
+    "react-native": "0.86.3",
+    "rn-mlkit-ocr": "0.3.1"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
@@ -24,6 +25,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios --device",
     "web": "expo start --web",
+    "test": "node --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0"
   },

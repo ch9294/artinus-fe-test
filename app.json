@@ -36,8 +36,17 @@
         "expo-build-properties",
         {
           "ios": {
-            "enableSceneSupport": true
+            "enableSceneSupport": true,
+            "deploymentTarget": "16.4"
           }
+        }
+      ],
+      "./plugins/withOcrPodModels",
+      [
+        "rn-mlkit-ocr",
+        {
+          "ocrModels": ["latin", "korean"],
+          "ocrUseBundled": true
         }
       ]
     ]
