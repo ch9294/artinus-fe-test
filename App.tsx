@@ -196,6 +196,7 @@ export default function App() {
           <CameraView
             key={cameraKey}
             ref={camera}
+            autofocus="off"
             facing="back"
             mode="picture"
             onCameraReady={() => setCameraReady(true)}

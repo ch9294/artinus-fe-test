@@ -1,2 +1,4 @@
 allowBuilds:
   unrs-resolver: true
+patchedDependencies:
+  expo-camera@57.0.5: patches/expo-camera@57.0.5.patch
