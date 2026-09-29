@@ -81,10 +81,20 @@ ADB에서 `com.ch9294.artinusfetest` 프로세스와 전면 `MainActivity`를 �
 
 검증 후 이 세션의 Metro 프로세스는 종료했다. 다시 실행할 때는 저장소 루트에서 `pnpm start`를 실행하고 설치된 개발 빌드를 연다.
 
+## 2026-09-29 Android 실기기 SDK 경로·Metro 연결 수정
+
+사용자가 새로 확보한 USB 실기기에서 `pnpm android`를 실행했을 때 Gradle이 SDK 경로를 찾지 못했다. 실제 SDK는 `/Users/ch9294/Library/Android/sdk`에 있었으나 해당 셸의 `ANDROID_HOME`과 생성된 `android/local.properties`가 모두 없었다. Java 17은 `java -version`으로 확인했다. Git에서 제외되는 `android/local.properties`에 `sdk.dir=/Users/ch9294/Library/Android/sdk`를 기록해 이 체크아웃의 Gradle 경로를 복구했다. 새 체크아웃과 `expo prebuild --clean` 뒤에는 README의 환경 변수 설정 또는 로컬 속성 파일 생성이 필요하다.
+
+ADB에서 `SM_A245N` 실기기(시리얼 `R59X301PBYV`)가 `device` 상태이고 Android 16/API 36임을 확인했다. 다시 실행한 `pnpm android`는 **BUILD SUCCESSFUL**(31초)로 끝나고 디버그 APK를 실기기에 설치했다. 최초 자동 실행은 LAN 주소 `192.168.0.7:8081` 연결에 실패해 Expo 개발 클라이언트 오류 화면을 보였다. Metro는 호스트의 `127.0.0.1:8081`에서 HTTP 200으로 응답했고 `adb reverse`에는 `tcp:8081 tcp:8081`이 설정돼 있었다. 개발 클라이언트를 USB 전달 주소 `127.0.0.1:8081`로 다시 열자 **실기기 카메라 프리뷰 화면을 직접 확인**했다. 이어 `REACT_NATIVE_PACKAGER_HOSTNAME=127.0.0.1 pnpm android`에서 앱이 localhost URL로 열리는 것을 확인하고 이를 `android` 스크립트에 반영했다.
+
+여기서 확인한 범위는 SDK 경로 수정, Android 빌드·설치, 개발 클라이언트 연결, 카메라 프리뷰다. 실기기 촬영 이미지, 한국어·영어 OCR, 권한 거부 복구, 반복 촬영은 아직 확인하지 않았다. 화면 캡처는 임시 디렉터리에만 저장했다.
+
+AI 활용 기록: 문제는 SDK 경로 부재와 실기기의 Metro LAN 주소 접속 실패였다. 사용자는 `pnpm android` 오류 로그를 제공했다. 로컬 Gradle 속성 파일과 USB용 localhost 주소를 제안·적용했고, SDK·JDK·ADB·Metro 상태를 직접 확인한 후 실기기에서 재빌드·설치·프리뷰 로드를 검증했다.
+
 ## 남은 전제와 미검증 범위
 
 - iOS 재빌드는 이 Mac의 Xcode 27, CocoaPods 1.17.0, 사용자 Apple Development 인증서·기기 신뢰·개발자 모드가 필요하다. 개인 승인과 계정 조작은 사용자가 직접 완료했다.
-- Android 빌드 명령에는 위 SDK/JDK 경로를 명령별로 지정해 성공했다. 사용자 쉘 설정 파일에 `ANDROID_HOME`·`JAVA_HOME`을 영구 저장했는지는 확인하지 않았다. [Expo 안내](https://docs.expo.dev/workflow/android-studio-emulator/)에 따라 다른 쉘에서 실행할 때는 경로를 설정해야 한다.
+- Android 빌드 명령에는 9/26 SDK/JDK 경로를 명령별로 지정해 성공했다. 9/29에는 이 체크아웃의 무시되는 `android/local.properties`를 생성해 SDK 경로를 제공했다. 사용자 쉘 설정 파일에 `ANDROID_HOME`·`JAVA_HOME`을 영구 저장했는지는 확인하지 않았다. [Expo 안내](https://docs.expo.dev/workflow/android-studio-emulator/)에 따라 다른 쉘이나 새 체크아웃에서 실행할 때는 경로를 설정해야 한다.
 - 카메라·OCR는 아직 구현되지 않아 양 플랫폼 기능 동작, Android 실기기, 반복 실행 안정성·성능은 PR 01에서 검증하지 않았다. 계획상 Android 실기기 검증은 9/28부터 진행한다.
 
 ## AI 활용 기록
