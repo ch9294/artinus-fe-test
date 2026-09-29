@@ -1,12 +1,12 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { StatusBar } from 'expo-status-bar';
 import { recognizeText } from 'rn-mlkit-ocr';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -233,10 +233,12 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="light" />
-      {content}
-    </SafeAreaView>
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        {content}
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
