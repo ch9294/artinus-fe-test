@@ -2,10 +2,12 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { StatusBar } from 'expo-status-bar';
 import { recognizeText } from 'rn-mlkit-ocr';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Image,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,10 +15,11 @@ import {
   View,
 } from 'react-native';
 import { captureFlowReducer, initialCaptureFlow } from './src/captureFlow';
+import { cameraPermissionState } from './src/cameraPermission';
 import { summarizeOcrResults } from './src/ocrResult';
 
 export default function App() {
-  const [permission, requestPermission] = useCameraPermissions();
+  const [permission, requestPermission, getPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
   const captureInProgress = useRef(false);
   const ocrInProgress = useRef(false);
@@ -26,14 +29,45 @@ export default function App() {
   const [capturing, setCapturing] = useState(false);
   const [flow, dispatch] = useReducer(captureFlowReducer, initialCaptureFlow);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [permissionError, setPermissionError] = useState(false);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [permissionRefreshing, setPermissionRefreshing] = useState(false);
+  const [permissionCheckFailed, setPermissionCheckFailed] = useState(false);
+
+  const refreshPermission = useCallback(async () => {
+    setPermissionRefreshing(true);
+    setPermissionCheckFailed(false);
+    try {
+      await getPermission();
+      setPermissionError(null);
+    } catch {
+      setPermissionCheckFailed(true);
+    } finally {
+      setPermissionRefreshing(false);
+    }
+  }, [getPermission]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshPermission();
+    });
+    return () => subscription.remove();
+  }, [refreshPermission]);
 
   async function askForPermission() {
-    setPermissionError(false);
+    setPermissionError(null);
     try {
       await requestPermission();
     } catch {
-      setPermissionError(true);
+      setPermissionError('권한을 요청하지 못했습니다. 다시 시도해 주세요.');
+    }
+  }
+
+  async function openCameraSettings() {
+    setPermissionError(null);
+    try {
+      await Linking.openSettings();
+    } catch {
+      setPermissionError('설정을 열지 못했습니다. 기기 설정에서 이 앱의 카메라 권한을 허용해 주세요.');
     }
   }
 
@@ -95,24 +129,50 @@ export default function App() {
 
   let content;
 
-  if (!permission) {
-    content = <ActivityIndicator size="large" color="#ffffff" accessibilityLabel="카메라 권한 확인 중" />;
-  } else if (!permission.granted) {
+  const permissionState = cameraPermissionState(permission);
+
+  if (permissionState === 'checking' || permissionRefreshing) {
     content = (
       <View style={styles.centered}>
-        <Text style={styles.title}>카메라 접근이 필요합니다</Text>
-        <Text style={styles.description}>인식할 글자를 촬영하려면 카메라 권한을 허용해 주세요.</Text>
-        {permissionError && <Text style={styles.error}>권한을 요청하지 못했습니다. 다시 시도해 주세요.</Text>}
-        {(permission.status === 'undetermined' || permission.canAskAgain) ? (
+        <ActivityIndicator size="large" color="#ffffff" accessibilityLabel="카메라 권한 확인 중" />
+      </View>
+    );
+  } else if (permissionCheckFailed) {
+    content = (
+      <View style={styles.centered}>
+        <Text style={styles.title}>카메라 권한을 확인하지 못했습니다</Text>
+        <Text style={styles.description}>권한 상태를 다시 확인해 주세요.</Text>
+        <Pressable accessibilityRole="button" onPress={refreshPermission} style={styles.primaryButton}>
+          <Text style={styles.primaryButtonText}>권한 다시 확인</Text>
+        </Pressable>
+      </View>
+    );
+  } else if (permissionState !== 'allowed') {
+    content = (
+      <View style={styles.centered}>
+        <Text style={styles.title}>
+          {permissionState === 'initial' ? '카메라 접근이 필요합니다' : '카메라 권한이 거부되었습니다'}
+        </Text>
+        <Text style={styles.description}>
+          {permissionState === 'blocked'
+            ? '기기 설정에서 이 앱의 카메라 권한을 허용한 뒤 돌아오세요.'
+            : '인식할 글자를 촬영하려면 카메라 권한을 허용해 주세요.'}
+        </Text>
+        {permissionError && <Text style={styles.error}>{permissionError}</Text>}
+        {permissionState !== 'blocked' ? (
           <Pressable
             accessibilityRole="button"
             onPress={askForPermission}
             style={styles.primaryButton}
           >
-            <Text style={styles.primaryButtonText}>카메라 권한 요청</Text>
+            <Text style={styles.primaryButtonText}>
+              {permissionState === 'initial' ? '카메라 권한 요청' : '카메라 권한 다시 요청'}
+            </Text>
           </Pressable>
         ) : (
-          <Text style={styles.description}>기기 설정에서 이 앱의 카메라 권한을 허용해 주세요.</Text>
+          <Pressable accessibilityRole="button" onPress={openCameraSettings} style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>기기 설정 열기</Text>
+          </Pressable>
         )}
       </View>
     );
