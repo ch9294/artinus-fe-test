@@ -2,7 +2,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { StatusBar } from 'expo-status-bar';
 import { recognizeText } from 'rn-mlkit-ocr';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { useRef, useState } from 'react';
+import { useReducer, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -12,15 +12,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import { OcrSummary, summarizeOcrResults } from './src/ocrResult';
-
-type CapturedPhoto = {
-  uri: string;
-  width: number;
-  height: number;
-};
-
-type OcrState = OcrSummary | { status: 'idle' | 'processing' };
+import { captureFlowReducer, initialCaptureFlow } from './src/captureFlow';
+import { summarizeOcrResults } from './src/ocrResult';
 
 export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -31,11 +24,9 @@ export default function App() {
   const [cameraKey, setCameraKey] = useState(0);
   const [cameraReady, setCameraReady] = useState(false);
   const [capturing, setCapturing] = useState(false);
-  const [photo, setPhoto] = useState<CapturedPhoto | null>(null);
+  const [flow, dispatch] = useReducer(captureFlowReducer, initialCaptureFlow);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [imageError, setImageError] = useState(false);
   const [permissionError, setPermissionError] = useState(false);
-  const [ocrState, setOcrState] = useState<OcrState>({ status: 'idle' });
 
   async function askForPermission() {
     setPermissionError(false);
@@ -47,7 +38,7 @@ export default function App() {
   }
 
   async function takePhoto() {
-    if (!cameraReady || !camera.current || captureInProgress.current) return;
+    if (flow.screen !== 'camera' || !cameraReady || !camera.current || captureInProgress.current) return;
 
     captureInProgress.current = true;
     setCapturing(true);
@@ -56,9 +47,7 @@ export default function App() {
       // Expo processes orientation before returning the temporary image URI.
       const result = await camera.current.takePictureAsync({ skipProcessing: false });
       if (!result?.uri) throw new Error('Camera returned no image');
-      setImageError(false);
-      setOcrState({ status: 'idle' });
-      setPhoto({ uri: result.uri, width: result.width, height: result.height });
+      dispatch({ type: 'captured', photo: { uri: result.uri, width: result.width, height: result.height } });
     } catch {
       setCameraError('촬영하지 못했습니다. 다시 시도해 주세요.');
     } finally {
@@ -68,22 +57,22 @@ export default function App() {
   }
 
   async function recognizePhoto() {
-    if (!photo || imageError || ocrInProgress.current) return;
+    if (flow.screen !== 'photo' || flow.imageError || ocrInProgress.current) return;
 
     const requestId = ++ocrRequestId.current;
     ocrInProgress.current = true;
-    setOcrState({ status: 'processing' });
+    dispatch({ type: 'ocrStarted' });
 
     try {
       const results = await Promise.allSettled([
-        recognizeText(photo.uri, 'korean'),
-        recognizeText(photo.uri, 'latin'),
+        recognizeText(flow.photo.uri, 'korean'),
+        recognizeText(flow.photo.uri, 'latin'),
       ]);
       if (ocrRequestId.current === requestId) {
-        setOcrState(summarizeOcrResults(results));
+        dispatch({ type: 'ocrFinished', result: summarizeOcrResults(results) });
       }
     } catch {
-      if (ocrRequestId.current === requestId) setOcrState({ status: 'error' });
+      if (ocrRequestId.current === requestId) dispatch({ type: 'ocrFinished', result: { status: 'error' } });
     } finally {
       if (ocrRequestId.current === requestId) ocrInProgress.current = false;
     }
@@ -92,9 +81,7 @@ export default function App() {
   function retakePhoto() {
     ocrRequestId.current += 1;
     ocrInProgress.current = false;
-    setOcrState({ status: 'idle' });
-    setPhoto(null);
-    setImageError(false);
+    dispatch({ type: 'retake' });
     setCameraError(null);
     setCameraReady(false);
     setCameraKey((key) => key + 1);
@@ -129,56 +116,60 @@ export default function App() {
         )}
       </View>
     );
-  } else if (photo) {
+  } else if (flow.screen === 'result') {
+    content = (
+      <View style={styles.content}>
+        <Text style={styles.title}>인식 결과</Text>
+        {flow.ocr.partialFailure && (
+          <Text style={styles.error}>한 언어의 인식에 실패해 일부 결과만 표시했습니다.</Text>
+        )}
+        <ScrollView style={styles.resultScroll} contentContainerStyle={styles.resultScrollContent}>
+          <Text selectable style={styles.resultText}>{flow.ocr.text}</Text>
+        </ScrollView>
+        <Pressable accessibilityRole="button" onPress={retakePhoto} style={styles.primaryButton}>
+          <Text style={styles.primaryButtonText}>다시 촬영</Text>
+        </Pressable>
+      </View>
+    );
+  } else if (flow.screen === 'photo') {
     content = (
       <View style={styles.content}>
         <Text style={styles.title}>촬영 이미지 확인</Text>
-        {imageError ? (
+        {flow.imageError ? (
           <View style={styles.imageFallback}>
             <Text style={styles.error}>이미지를 표시하지 못했습니다. 다시 촬영해 주세요.</Text>
           </View>
         ) : (
           <Image
             accessibilityLabel="촬영한 이미지"
-            onError={() => setImageError(true)}
+            onError={() => dispatch({ type: 'imageFailed' })}
             resizeMode="contain"
-            source={{ uri: photo.uri }}
+            source={{ uri: flow.photo.uri }}
             style={styles.photo}
           />
         )}
-        {ocrState.status === 'processing' && (
+        {flow.ocr.status === 'processing' && (
           <View style={styles.ocrProgress}>
             <ActivityIndicator color="#ffffff" accessibilityLabel="텍스트 인식 중" />
             <Text style={styles.description}>텍스트 인식 중…</Text>
           </View>
         )}
-        {ocrState.status === 'success' && (
-          <View style={styles.resultContainer}>
-            <Text style={styles.resultTitle}>인식 결과</Text>
-            {ocrState.partialFailure && (
-              <Text style={styles.error}>한 언어의 인식에 실패해 일부 결과만 표시했습니다.</Text>
-            )}
-            <ScrollView nestedScrollEnabled>
-              <Text selectable style={styles.resultText}>{ocrState.text}</Text>
-            </ScrollView>
-          </View>
-        )}
-        {ocrState.status === 'empty' && (
+        {flow.ocr.status === 'empty' && (
           <Text style={styles.description}>글자를 찾지 못했습니다. 다시 촬영하거나 인식을 재시도해 주세요.</Text>
         )}
-        {ocrState.status === 'error' && (
+        {flow.ocr.status === 'error' && (
           <Text style={styles.error}>텍스트를 인식하지 못했습니다. 다시 시도해 주세요.</Text>
         )}
-        {!imageError && (
+        {!flow.imageError && (
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ disabled: ocrState.status === 'processing' }}
-            disabled={ocrState.status === 'processing'}
+            accessibilityState={{ disabled: flow.ocr.status === 'processing' }}
+            disabled={flow.ocr.status === 'processing'}
             onPress={recognizePhoto}
-            style={[styles.primaryButton, ocrState.status === 'processing' && styles.disabledButton]}
+            style={[styles.primaryButton, flow.ocr.status === 'processing' && styles.disabledButton]}
           >
             <Text style={styles.primaryButtonText}>
-              {ocrState.status === 'idle' ? '텍스트 인식' : '다시 인식'}
+              {flow.ocr.status === 'idle' ? '텍스트 인식' : '다시 인식'}
             </Text>
           </Pressable>
         )}
@@ -254,8 +245,8 @@ const styles = StyleSheet.create({
   photo: { flex: 1, width: '100%', backgroundColor: '#25313b' },
   imageFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   ocrProgress: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
-  resultContainer: { maxHeight: 180, gap: 8, borderRadius: 12, padding: 12, backgroundColor: '#25313b' },
-  resultTitle: { color: '#ffffff', fontSize: 17, fontWeight: '700' },
+  resultScroll: { flex: 1, minHeight: 0, borderRadius: 12, backgroundColor: '#25313b' },
+  resultScrollContent: { padding: 16 },
   resultText: { color: '#ffffff', fontSize: 16, lineHeight: 24 },
   error: { color: '#ffb4a9', fontSize: 15, textAlign: 'center' },
   primaryButton: {
