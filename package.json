@@ -10,7 +10,9 @@
     "expo-dev-client": "~57.0.19",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
-    "react-native": "0.86.3"
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "rn-mlkit-ocr": "0.3.1"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
@@ -21,9 +23,10 @@
   "scripts": {
     "start": "expo start --dev-client",
     "start:tunnel": "expo start --dev-client --tunnel",
-    "android": "expo run:android",
+    "android": "REACT_NATIVE_PACKAGER_HOSTNAME=127.0.0.1 expo run:android",
     "ios": "expo run:ios --device",
     "web": "expo start --web",
+    "test": "node --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0"
   },

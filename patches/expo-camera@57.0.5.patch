@@ -1,0 +1,49 @@
+diff --git a/ios/Common/DeviceDiscovery.swift b/ios/Common/DeviceDiscovery.swift
+index 89fdca0a52c19a749a0aa9ffd29da1fc39cbd456..f1928acdefba82e30de028546475a3746066613d 100644
+--- a/ios/Common/DeviceDiscovery.swift
++++ b/ios/Common/DeviceDiscovery.swift
+@@ -107,6 +107,15 @@ class DeviceDiscovery {
+   }
+ 
+   var defaultBackCamera: AVCaptureDevice? {
++    // A virtual camera can fall back to its ultra-wide lens when the subject is
++    // too close for the wide lens to focus. Prefer one that includes both.
++    for type in [AVCaptureDevice.DeviceType.builtInTripleCamera, .builtInDualWideCamera] {
++      if let virtualCamera = AVCaptureDevice.default(type, for: .video, position: .back),
++         self.backCameraLenses.contains(virtualCamera) {
++        return virtualCamera
++      }
++    }
++
+     if let standardBack = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) {
+       if self.backCameraLenses.contains(standardBack) {
+         return standardBack
+diff --git a/ios/Current/CameraSessionManager.swift b/ios/Current/CameraSessionManager.swift
+index 7a6568c3f0cdad49c1ab276da79660fdcd9a24dc..9e60c4001797f9eb4ed5334401bfa1d624eb234b 100644
+--- a/ios/Current/CameraSessionManager.swift
++++ b/ios/Current/CameraSessionManager.swift
+@@ -217,7 +217,15 @@ class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
+     do {
+       try device.lockForConfiguration()
+       defer { device.unlockForConfiguration() }
+-      let minZoom = 1.0
++      // Start a wide + ultra-wide virtual camera at the wide lens's field of
++      // view. At this switch-over factor, AVFoundation may use the ultra-wide
++      // lens as a close-focus fallback without changing the framing.
++      let minZoom: CGFloat
++      if device.deviceType == .builtInTripleCamera || device.deviceType == .builtInDualWideCamera {
++        minZoom = device.virtualDeviceSwitchOverVideoZoomFactors.first.map { CGFloat(truncating: $0) } ?? 1.0
++      } else {
++        minZoom = 1.0
++      }
+       device.videoZoomFactor = minZoom * pow(device.activeFormat.videoMaxZoomFactor / minZoom, delegate.zoom)
+     } catch {
+       log.info("\(#function): \(error.localizedDescription)")
+@@ -356,6 +364,7 @@ class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
+         session.addInput(deviceInput)
+         captureDeviceInput = deviceInput
+         updateZoom()
++        setFocusMode()
+       }
+     } catch {
+       delegate.onMountError(["message": "Camera could not be started - \(error.localizedDescription)"])
