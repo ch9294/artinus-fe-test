@@ -1,10 +1,9 @@
 diff --git a/ios/Common/DeviceDiscovery.swift b/ios/Common/DeviceDiscovery.swift
-index 89fdca0a52c19a749a0aa9ffd29da1fc39cbd456..f1928acdefba82e30de028546475a3746066613d 100644
 --- a/ios/Common/DeviceDiscovery.swift
 +++ b/ios/Common/DeviceDiscovery.swift
-@@ -107,6 +107,15 @@ class DeviceDiscovery {
+@@ -107,6 +107,15 @@
    }
- 
+
    var defaultBackCamera: AVCaptureDevice? {
 +    // A virtual camera can fall back to its ultra-wide lens when the subject is
 +    // too close for the wide lens to focus. Prefer one that includes both.
@@ -19,10 +18,32 @@ index 89fdca0a52c19a749a0aa9ffd29da1fc39cbd456..f1928acdefba82e30de028546475a374
        if self.backCameraLenses.contains(standardBack) {
          return standardBack
 diff --git a/ios/Current/CameraSessionManager.swift b/ios/Current/CameraSessionManager.swift
-index 7a6568c3f0cdad49c1ab276da79660fdcd9a24dc..9e60c4001797f9eb4ed5334401bfa1d624eb234b 100644
 --- a/ios/Current/CameraSessionManager.swift
 +++ b/ios/Current/CameraSessionManager.swift
-@@ -217,7 +217,15 @@ class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
+@@ -76,6 +76,10 @@
+         }
+       }
+     }
++    if withSessionConfiguration {
++      // A committed preset can change the active format and its zoom range.
++      updateZoom()
++    }
+   }
+
+   func updateDevice() {
+@@ -122,7 +126,10 @@
+       return
+     }
+     self.session.beginConfiguration()
+-    defer { self.session.commitConfiguration() }
++    defer {
++      self.session.commitConfiguration()
++      updateZoom()
++    }
+     if delegate.mode == .video {
+       if self.videoFileOutput == nil {
+         self.setupMovieFileCapture(withSessionConfiguration: false)
+@@ -217,7 +224,15 @@
      do {
        try device.lockForConfiguration()
        defer { device.unlockForConfiguration() }
@@ -39,7 +60,7 @@ index 7a6568c3f0cdad49c1ab276da79660fdcd9a24dc..9e60c4001797f9eb4ed5334401bfa1d6
        device.videoZoomFactor = minZoom * pow(device.activeFormat.videoMaxZoomFactor / minZoom, delegate.zoom)
      } catch {
        log.info("\(#function): \(error.localizedDescription)")
-@@ -356,6 +364,7 @@ class CameraSessionManager: NSObject, DeviceDiscoveryDelegate {
+@@ -356,6 +371,7 @@
          session.addInput(deviceInput)
          captureDeviceInput = deviceInput
          updateZoom()
@@ -47,3 +68,12 @@ index 7a6568c3f0cdad49c1ab276da79660fdcd9a24dc..9e60c4001797f9eb4ed5334401bfa1d6
        }
      } catch {
        delegate.onMountError(["message": "Camera could not be started - \(error.localizedDescription)"])
+@@ -416,6 +432,8 @@
+     configureResponsiveCapture(photoOutput)
+
+     session.commitConfiguration()
++    // Apply the default framing after the photo preset has selected its format.
++    updateZoom()
+     addErrorNotification()
+     delegate.configurePreviewRotation()
+     delegate.barcodeScanner?.maybeStartBarcodeScanning()
