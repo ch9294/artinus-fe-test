@@ -248,6 +248,7 @@ export default function App() {
     content = (
       <View style={styles.content}>
         <Text style={styles.title}>인식 결과</Text>
+        <Text style={styles.description}>글자가 빠졌거나 다르게 인식되었다면 다시 촬영해 주세요.</Text>
         {flow.ocr.partialFailure && (
           <Text style={styles.error}>한 언어의 인식에 실패해 일부 결과만 표시했습니다.</Text>
         )}
@@ -283,10 +284,12 @@ export default function App() {
           </View>
         )}
         {flow.ocr.status === 'empty' && (
-          <Text style={styles.description}>글자를 찾지 못했습니다. 다시 촬영하거나 인식을 재시도해 주세요.</Text>
+          <Text style={styles.description}>
+            글자를 찾지 못했습니다. 밝은 곳에서 거리를 조절하고, 글자가 기울지 않게 다시 촬영해 주세요.
+          </Text>
         )}
         {flow.ocr.status === 'error' && (
-          <Text style={styles.error}>텍스트를 인식하지 못했습니다. 다시 시도해 주세요.</Text>
+          <Text style={styles.error}>인식 중 문제가 발생했습니다. 다시 인식하거나 새로 촬영해 주세요.</Text>
         )}
         {!flow.imageError && (
           <Pressable
@@ -310,7 +313,9 @@ export default function App() {
     content = (
       <View style={styles.content}>
         <Text style={styles.title}>글자 촬영</Text>
-        <Text style={styles.description}>글자가 화면 안에 들어오도록 맞춘 뒤 촬영하세요.</Text>
+        <Text style={styles.description}>
+          밝은 곳에서 글자가 선명해지도록 거리를 조절하세요. 글자가 기울지 않게 화면 안에 담아 촬영하세요.
+        </Text>
         <View style={styles.previewContainer}>
           <CameraView
             key={cameraKey}
