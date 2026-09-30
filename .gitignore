@@ -39,3 +39,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# local documentation and editing artifacts
+/docs/*
+!/docs/assignment-plan.md
+/_workspace/
